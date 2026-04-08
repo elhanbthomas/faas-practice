@@ -46,8 +46,8 @@ jobs:
           eval $(minikube docker-env)
           
           # Build, skip push (since it's local), and deploy
-          faas-cli build -f my-python-fn.yml
-          faas-cli deploy -f my-python-fn.yml --image-pull-policy IfNotPresent
+          faas-cli build -f stack.yaml
+          
 
       # 7. Integration Test
       - name: Test Function
