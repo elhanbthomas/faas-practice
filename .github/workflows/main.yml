@@ -1,0 +1,56 @@
+name: CI/CD OpenFaaS
+on: [push]
+
+jobs:
+  openfaas-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 1. Create a Kubernetes cluster inside the runner
+      - name: Setup Minikube
+        uses: medyagh/setup-minikube@master
+
+      # 2. Setup Terraform and Apply your main.tf
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        
+      - name: Terraform Apply
+        run: |
+          terraform init
+          terraform apply -auto-approve
+
+      # 3. Setup OpenFaaS CLI
+      - name: Install faas-cli
+        run: curl -sSL https://cli.openfaas.com | sudo sh
+
+      # 4. Connect to the Gateway
+      # We port-forward in the background so the CLI can talk to K8s
+      - name: Port Forward Gateway
+        run: |
+          kubectl port-forward -n openfaas svc/gateway 8080:8080 &
+          sleep 5 # Wait for connection to establish
+
+      # 5. Authenticate
+      - name: Login to OpenFaaS
+        run: |
+          PASSWORD=$(kubectl -n openfaas get secret basic-auth -o jsonpath="{.data.basic-auth-password}" | base64 --decode)
+          echo $PASSWORD | faas-cli login --password-stdin
+
+      # 6. Build and Deploy Function
+      # We use 'minikube image build' to avoid needing a Docker Hub login
+      - name: Build and Deploy Function
+        run: |
+          # Point the CLI to use the Minikube Docker daemon
+          eval $(minikube docker-env)
+          
+          # Build, skip push (since it's local), and deploy
+          faas-cli build -f my-python-fn.yml
+          faas-cli deploy -f my-python-fn.yml --image-pull-policy IfNotPresent
+
+      # 7. Integration Test
+      - name: Test Function
+        run: |
+          sleep 10 # Wait for pod to pull and start
+          echo "GitHub Actions Test" | faas-cli invoke my-python-fn
