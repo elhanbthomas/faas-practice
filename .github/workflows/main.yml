@@ -53,4 +53,4 @@ jobs:
       - name: Test Function
         run: |
           sleep 10 # Wait for pod to pull and start
-          echo "GitHub Actions Test" | faas-cli invoke my-python-fn
+          echo "GitHub Actions Test" | faas-cli invoke practice-function
